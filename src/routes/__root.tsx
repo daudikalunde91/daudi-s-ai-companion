@@ -11,6 +11,9 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AuthProvider } from "@/lib/auth-context";
+import { ThemeProvider } from "@/lib/theme-context";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -77,11 +80,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Rafiki AI — Your friendly AI assistant" },
+      { name: "description", content: "Rafiki AI is a warm, multilingual AI companion that gives deep, well-formatted answers in any language." },
+      { name: "author", content: "Mr Daudi Kalunde" },
+      { property: "og:title", content: "Rafiki AI — Your friendly AI assistant" },
+      { property: "og:description", content: "Warm, multilingual AI companion with deep, well-formatted answers." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -118,8 +121,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <ThemeProvider>
+        <AuthProvider>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+          <Toaster richColors closeButton />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
