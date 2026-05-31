@@ -104,7 +104,7 @@ function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
             </div>
-            <Button type="submit" disabled={busy} variant="hero" className="w-full">
+            <Button type="submit" disabled={busy} className="w-full">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
           </form>

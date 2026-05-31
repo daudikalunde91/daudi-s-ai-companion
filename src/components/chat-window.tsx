@@ -1,0 +1,163 @@
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowUp, Loader2 } from "lucide-react";
+import logo from "@/assets/logo.png";
+
+type Props = { threadId: string; initialMessages: UIMessage[] };
+
+export function ChatWindow({ threadId, initialMessages }: Props) {
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        fetch: async (input, init) => {
+          const { data } = await supabase.auth.getSession();
+          const token = data.session?.access_token;
+          const headers = new Headers(init?.headers);
+          if (token) headers.set("Authorization", `Bearer ${token}`);
+          // Inject threadId into request body
+          let body = init?.body;
+          if (typeof body === "string") {
+            try {
+              const parsed = JSON.parse(body);
+              parsed.threadId = threadId;
+              body = JSON.stringify(parsed);
+            } catch {
+              /* noop */
+            }
+          }
+          return fetch(input as RequestInfo, { ...init, headers, body });
+        },
+      }),
+    [threadId],
+  );
+
+  const { messages, sendMessage, status, error } = useChat({
+    id: threadId,
+    messages: initialMessages,
+    transport,
+  });
+
+  const [input, setInput] = useState("");
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    taRef.current?.focus();
+  }, [threadId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, status]);
+
+  const isLoading = status === "submitted" || status === "streaming";
+
+  async function submit(e?: React.FormEvent) {
+    e?.preventDefault();
+    const text = input.trim();
+    if (!text || isLoading) return;
+    setInput("");
+    await sendMessage({ text });
+    setTimeout(() => taRef.current?.focus(), 50);
+  }
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+          {messages.length === 0 && (
+            <div className="text-center py-16">
+              <img src={logo} alt="" width={64} height={64} className="mx-auto rounded-2xl shadow-[var(--shadow-glow)]" />
+              <h2 className="mt-4 text-2xl font-semibold">Mambo, rafiki! 👋</h2>
+              <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+                Ask me anything in any language. I'm here to help with deep, friendly answers.
+              </p>
+            </div>
+          )}
+
+          {messages.map((m) => (
+            <MessageBubble key={m.id} message={m} />
+          ))}
+
+          {status === "submitted" && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Rafiki is thinking…
+            </div>
+          )}
+
+          {error && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+              {error.message}
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      <div className="border-t border-border bg-background/80 backdrop-blur">
+        <form onSubmit={submit} className="max-w-3xl mx-auto px-4 py-4">
+          <div className="relative flex items-end gap-2 bg-card border border-border rounded-2xl p-2 shadow-sm focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 transition">
+            <Textarea
+              ref={taRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="Andika ujumbe wako… (type your message)"
+              rows={1}
+              className="flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 max-h-48 text-sm"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim() || isLoading}
+              className="rounded-xl shrink-0"
+              style={{ background: "var(--gradient-primary)", color: "var(--primary-foreground)" }}
+              aria-label="Send"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground text-center mt-2">
+            Rafiki AI — Created by Mr Daudi Kalunde from Tanzania
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: UIMessage }) {
+  const text = (message.parts ?? [])
+    .map((p) => (p.type === "text" ? p.text : ""))
+    .join("");
+
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-2xl rounded-tr-md px-4 py-2.5 bg-primary text-primary-foreground text-sm whitespace-pre-wrap">
+          {text}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-3">
+      <img src={logo} alt="" width={28} height={28} className="rounded-lg shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0 prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-hr:my-4">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text || "…"}</ReactMarkdown>
+      </div>
+    </div>
+  );
+}
