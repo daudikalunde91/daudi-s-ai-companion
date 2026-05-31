@@ -5,7 +5,7 @@ import { z } from "zod";
 export type StoredMessage = {
   id: string;
   role: "user" | "assistant" | "system";
-  parts: unknown;
+  parts: Array<{ type: string; text?: string; [k: string]: unknown }>;
 };
 
 export const listThreads = createServerFn({ method: "GET" })
@@ -57,7 +57,7 @@ export const getThreadMessages = createServerFn({ method: "GET" })
     const messages: StoredMessage[] = (rows ?? []).map((r) => ({
       id: r.id,
       role: r.role as StoredMessage["role"],
-      parts: r.parts,
+      parts: (Array.isArray(r.parts) ? r.parts : []) as StoredMessage["parts"],
     }));
     return messages;
   });
