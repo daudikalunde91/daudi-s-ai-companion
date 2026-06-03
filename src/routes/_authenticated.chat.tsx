@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,9 +10,10 @@ export const Route = createFileRoute("/_authenticated/chat")({
 });
 
 function ChatIndex() {
-  return (
-    <EmptyOrCreate />
-  );
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isChatIndex = pathname === "/chat";
+
+  return isChatIndex ? <EmptyOrCreate /> : <Outlet />;
 }
 
 function EmptyOrCreate() {
