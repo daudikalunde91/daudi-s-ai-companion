@@ -1,0 +1,1 @@
+DELETE FROM public.threads t WHERE NOT EXISTS (SELECT 1 FROM public.messages m WHERE m.thread_id = t.id);
