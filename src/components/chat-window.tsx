@@ -6,7 +6,9 @@ import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp, Loader2, Mic, MicOff } from "lucide-react";
+import { useVoiceSettings } from "@/lib/voice-settings";
+import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 
 type Props = { threadId: string; initialMessages: UIMessage[] };
@@ -47,6 +49,52 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
   const [input, setInput] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const voice = useVoiceSettings();
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<any>(null);
+  const spokenRef = useRef<Set<string>>(new Set());
+
+  // Auto-speak completed assistant messages
+  useEffect(() => {
+    if (!voice.autoSpeak) return;
+    if (status === "submitted" || status === "streaming") return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (spokenRef.current.has(last.id)) return;
+    const text = (last.parts ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
+    if (!text.trim()) return;
+    spokenRef.current.add(last.id);
+    voice.speak(text);
+  }, [messages, status, voice]);
+
+  useEffect(() => () => voice.stop(), [voice]);
+
+  function toggleMic() {
+    const SR: any =
+      (typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
+    if (!SR) {
+      toast.error("Kifaa hiki hakitumii kuongea-kuwa-maandishi.");
+      return;
+    }
+    if (listening && recRef.current) {
+      recRef.current.stop();
+      return;
+    }
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = navigator.language || "en-US";
+    rec.onresult = (e: any) => {
+      let txt = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      setInput((prev) => (prev ? prev + " " : "") + txt.trim());
+    };
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+    recRef.current = rec;
+    setListening(true);
+    rec.start();
+  }
 
   useEffect(() => {
     taRef.current?.focus();
@@ -62,6 +110,7 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
     e?.preventDefault();
     const text = input.trim();
     if (!text || isLoading) return;
+    voice.stop();
     setInput("");
     await sendMessage({ text });
     setTimeout(() => taRef.current?.focus(), 50);
@@ -117,6 +166,17 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
               rows={1}
               className="flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 max-h-48 text-sm"
             />
+            <Button
+              type="button"
+              size="icon"
+              variant={listening ? "default" : "ghost"}
+              onClick={toggleMic}
+              className="rounded-xl shrink-0"
+              aria-label={listening ? "Stop voice input" : "Start voice input"}
+              title={listening ? "Acha kurekodi" : "Ongea badala ya kuandika"}
+            >
+              {listening ? <MicOff className="h-4 w-4 animate-pulse" /> : <Mic className="h-4 w-4" />}
+            </Button>
             <Button
               type="submit"
               size="icon"
