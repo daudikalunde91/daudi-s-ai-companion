@@ -7,7 +7,12 @@ import { useTheme } from "@/lib/theme-context";
 import { supabase } from "@/integrations/supabase/client";
 import { listThreads, createThread, deleteThread } from "@/lib/chat.functions";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Sun, Moon, LogOut, Loader2, MessageSquare } from "lucide-react";
+import { Plus, Trash2, Sun, Moon, LogOut, Loader2, MessageSquare, Settings2, Volume2, VolumeX } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useVoiceSettings } from "@/lib/voice-settings";
 import logo from "@/assets/logo.png";
 import { toast } from "sonner";
 
@@ -21,6 +26,7 @@ function AuthLayout() {
   const router = useRouter();
   const { theme, toggle } = useTheme();
   const qc = useQueryClient();
+  const voice = useVoiceSettings();
 
   const listFn = useServerFn(listThreads);
   const createFn = useServerFn(createThread);
@@ -125,6 +131,50 @@ function AuthLayout() {
           <div className="flex-1 min-w-0 text-xs">
             <div className="truncate font-medium">{user.email}</div>
           </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="icon" variant="ghost" aria-label="Settings">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 space-y-4">
+              <div className="space-y-1">
+                <div className="text-sm font-semibold">Mipangilio</div>
+                <div className="text-xs text-muted-foreground">Badilisha mwonekano na sauti.</div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="dark" className="text-sm">Dark mode</Label>
+                <Switch id="dark" checked={theme === "dark"} onCheckedChange={toggle} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="autospeak" className="text-sm flex items-center gap-1.5">
+                  {voice.autoSpeak ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                  Sema majibu
+                </Label>
+                <Switch id="autospeak" checked={voice.autoSpeak} onCheckedChange={voice.setAutoSpeak} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Sauti ya AI</Label>
+                <Select
+                  value={voice.voiceURI ?? "default"}
+                  onValueChange={(v) => voice.setVoiceURI(v === "default" ? null : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Chagua sauti" /></SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    <SelectItem value="default">Sauti chaguomsingi</SelectItem>
+                    {voice.voices.map((v) => (
+                      <SelectItem key={v.voiceURI} value={v.voiceURI}>
+                        {v.name} {v.lang ? `· ${v.lang}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {voice.voices.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">Hakuna sauti zilizopatikana kwenye kifaa hiki.</p>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button size="icon" variant="ghost" onClick={toggle} aria-label="Toggle theme">
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </Button>
