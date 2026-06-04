@@ -224,9 +224,66 @@ function MessageBubble({ message }: { message: UIMessage }) {
   return (
     <div className="flex gap-3">
       <img src={logo} alt="" className="rounded-lg shrink-0 mt-0.5 h-7 w-7 object-cover self-start" />
-      <div className="flex-1 min-w-0 prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-hr:my-4">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text || "…"}</ReactMarkdown>
+      <div className="flex-1 min-w-0 group">
+        <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:p-0 prose-pre:bg-transparent prose-code:text-foreground prose-hr:my-4">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              pre: ({ children }) => <>{children}</>,
+              code: ({ className, children, ...props }: any) => {
+                const inline = !(className && /language-/.test(className));
+                if (inline) {
+                  return <code className={className} {...props}>{children}</code>;
+                }
+                const codeText = String(children).replace(/\n$/, "");
+                const lang = (className || "").replace("language-", "");
+                return <CodeBlock code={codeText} language={lang} />;
+              },
+            }}
+          >{text || "…"}</ReactMarkdown>
+        </div>
+        {text && (
+          <div className="mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <CopyButton value={text} label="Nakili jibu" />
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function CopyButton({ value, label = "Nakili" }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-7 px-2 text-xs text-muted-foreground gap-1.5"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          toast.error("Imeshindikana kunakili");
+        }
+      }}
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? "Imenakiliwa" : label}
+    </Button>
+  );
+}
+
+function CodeBlock({ code, language }: { code: string; language?: string }) {
+  return (
+    <div className="relative my-3 rounded-lg border border-border bg-muted overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/50">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{language || "code"}</span>
+        <CopyButton value={code} label="Nakili" />
+      </div>
+      <pre className="p-3 overflow-x-auto text-xs"><code>{code}</code></pre>
     </div>
   );
 }
