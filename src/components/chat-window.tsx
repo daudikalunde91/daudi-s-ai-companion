@@ -262,7 +262,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
 
   return (
     <div className="flex gap-3">
-      <img src={logo} alt="" width={28} height={28} className="rounded-lg shrink-0 mt-0.5" />
+      <img src={logo} alt="" className="rounded-lg shrink-0 mt-0.5 h-7 w-7 object-cover self-start" />
       <div className="flex-1 min-w-0 prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-hr:my-4">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{text || "…"}</ReactMarkdown>
       </div>
