@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowUp, Loader2, Mic, MicOff, PhoneCall, PhoneOff } from "lucide-react";
+import { ArrowUp, Check, Copy, Loader2, Mic, MicOff } from "lucide-react";
 import { useVoiceSettings } from "@/lib/voice-settings";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
@@ -53,13 +53,10 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
   const [listening, setListening] = useState(false);
   const recRef = useRef<any>(null);
   const spokenRef = useRef<Set<string>>(new Set());
-  const [callMode, setCallMode] = useState(false);
-  const callModeRef = useRef(false);
-  useEffect(() => { callModeRef.current = callMode; }, [callMode]);
 
   // Auto-speak completed assistant messages
   useEffect(() => {
-    if (!voice.autoSpeak && !callMode) return;
+    if (!voice.autoSpeak) return;
     if (status === "submitted" || status === "streaming") return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") return;
@@ -68,7 +65,7 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
     if (!text.trim()) return;
     spokenRef.current.add(last.id);
     voice.speak(text);
-  }, [messages, status, voice, callMode]);
+  }, [messages, status, voice]);
 
   useEffect(() => () => voice.stop(), [voice]);
 
@@ -96,14 +93,6 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
     rec.onerror = () => setListening(false);
     rec.onend = () => {
       setListening(false);
-      if (callModeRef.current) {
-        // restart automatically while in call mode (unless TTS is speaking)
-        setTimeout(() => {
-          if (callModeRef.current && !window.speechSynthesis?.speaking) {
-            try { rec.start(); setListening(true); } catch { /* noop */ }
-          }
-        }, 400);
-      }
     };
     recRef.current = rec;
     setListening(true);
@@ -114,23 +103,6 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
   function toggleMic() {
     if (listening && recRef.current) { recRef.current.stop(); return; }
     startRecognition(false);
-  }
-
-  function toggleCall() {
-    if (callMode) {
-      setCallMode(false);
-      callModeRef.current = false;
-      recRef.current?.stop?.();
-      voice.stop();
-      return;
-    }
-    setCallMode(true);
-    callModeRef.current = true;
-    startRecognition(true, async (finalText) => {
-      if (!finalText) return;
-      voice.stop();
-      await sendMessage({ text: finalText });
-    });
   }
 
   useEffect(() => {
