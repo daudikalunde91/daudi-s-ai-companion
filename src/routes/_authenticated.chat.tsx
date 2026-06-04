@@ -52,7 +52,7 @@ function Welcome() {
           </div>
           <div className="rounded-xl border border-border p-3 bg-card">
             <Mic className="h-4 w-4 text-primary mb-1.5" />
-            <p className="text-xs text-muted-foreground">Ongea moja kwa moja — bonyeza ikoni ya simu kuanza.</p>
+            <p className="text-xs text-muted-foreground">Ongea badala ya kuandika — bonyeza ikoni ya maikrofoni.</p>
           </div>
         </div>
         <Button
