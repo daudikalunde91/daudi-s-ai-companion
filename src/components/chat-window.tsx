@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowUp, Loader2, Mic, MicOff } from "lucide-react";
+import { ArrowUp, Loader2, Mic, MicOff, PhoneCall, PhoneOff } from "lucide-react";
 import { useVoiceSettings } from "@/lib/voice-settings";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
@@ -53,10 +53,13 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
   const [listening, setListening] = useState(false);
   const recRef = useRef<any>(null);
   const spokenRef = useRef<Set<string>>(new Set());
+  const [callMode, setCallMode] = useState(false);
+  const callModeRef = useRef(false);
+  useEffect(() => { callModeRef.current = callMode; }, [callMode]);
 
   // Auto-speak completed assistant messages
   useEffect(() => {
-    if (!voice.autoSpeak) return;
+    if (!voice.autoSpeak && !callMode) return;
     if (status === "submitted" || status === "streaming") return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") return;
@@ -65,35 +68,69 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
     if (!text.trim()) return;
     spokenRef.current.add(last.id);
     voice.speak(text);
-  }, [messages, status, voice]);
+  }, [messages, status, voice, callMode]);
 
   useEffect(() => () => voice.stop(), [voice]);
 
-  function toggleMic() {
+  function startRecognition(continuous: boolean, onFinal?: (text: string) => void) {
     const SR: any =
       (typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
     if (!SR) {
       toast.error("Kifaa hiki hakitumii kuongea-kuwa-maandishi.");
-      return;
-    }
-    if (listening && recRef.current) {
-      recRef.current.stop();
-      return;
+      return null;
     }
     const rec = new SR();
-    rec.continuous = false;
+    rec.continuous = continuous;
     rec.interimResults = true;
     rec.lang = navigator.language || "en-US";
     rec.onresult = (e: any) => {
-      let txt = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript;
-      setInput((prev) => (prev ? prev + " " : "") + txt.trim());
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        const txt = r[0].transcript;
+        if (r.isFinal) {
+          if (onFinal) onFinal(txt.trim());
+          else setInput((prev) => (prev ? prev + " " : "") + txt.trim());
+        }
+      }
     };
     rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.onend = () => {
+      setListening(false);
+      if (callModeRef.current) {
+        // restart automatically while in call mode (unless TTS is speaking)
+        setTimeout(() => {
+          if (callModeRef.current && !window.speechSynthesis?.speaking) {
+            try { rec.start(); setListening(true); } catch { /* noop */ }
+          }
+        }, 400);
+      }
+    };
     recRef.current = rec;
     setListening(true);
     rec.start();
+    return rec;
+  }
+
+  function toggleMic() {
+    if (listening && recRef.current) { recRef.current.stop(); return; }
+    startRecognition(false);
+  }
+
+  function toggleCall() {
+    if (callMode) {
+      setCallMode(false);
+      callModeRef.current = false;
+      recRef.current?.stop?.();
+      voice.stop();
+      return;
+    }
+    setCallMode(true);
+    callModeRef.current = true;
+    startRecognition(true, async (finalText) => {
+      if (!finalText) return;
+      voice.stop();
+      await sendMessage({ text: finalText });
+    });
   }
 
   useEffect(() => {
@@ -166,6 +203,17 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
               rows={1}
               className="flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 max-h-48 text-sm"
             />
+            <Button
+              type="button"
+              size="icon"
+              variant={callMode ? "default" : "ghost"}
+              onClick={toggleCall}
+              className="rounded-xl shrink-0"
+              aria-label={callMode ? "End voice conversation" : "Start voice conversation"}
+              title={callMode ? "Maliza mazungumzo ya sauti" : "Anza mazungumzo ya sauti"}
+            >
+              {callMode ? <PhoneOff className="h-4 w-4" /> : <PhoneCall className="h-4 w-4" />}
+            </Button>
             <Button
               type="button"
               size="icon"
