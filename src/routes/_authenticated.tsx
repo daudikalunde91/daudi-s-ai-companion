@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useNavigate, Link, useParams, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth-context";
@@ -7,7 +7,7 @@ import { useTheme } from "@/lib/theme-context";
 import { supabase } from "@/integrations/supabase/client";
 import { listThreads, createThread, deleteThread } from "@/lib/chat.functions";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Sun, Moon, LogOut, Loader2, MessageSquare, Settings2, Volume2, VolumeX } from "lucide-react";
+import { Plus, Trash2, Sun, Moon, LogOut, Loader2, MessageSquare, Settings2, Volume2, VolumeX, Menu, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -27,6 +27,7 @@ function AuthLayout() {
   const { theme, toggle } = useTheme();
   const qc = useQueryClient();
   const voice = useVoiceSettings();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const listFn = useServerFn(listThreads);
   const createFn = useServerFn(createThread);
@@ -84,7 +85,24 @@ function AuthLayout() {
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
-      <aside className="hidden md:flex w-72 flex-col bg-sidebar border-r border-sidebar-border">
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm"
+          aria-hidden
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-72 flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-200 ${
+          sidebarOpen ? "translate-x-0 flex" : "-translate-x-full flex"
+        }`}
+      >
+        <div className="flex items-center justify-between px-4 pt-3">
+          <span className="text-xs text-muted-foreground">Menyu</span>
+          <Button size="icon" variant="ghost" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
         <div className="p-4 flex items-center gap-2.5">
           <img src={logo} alt="" width={32} height={32} className="rounded-lg" />
           <div className="leading-tight">
@@ -185,6 +203,15 @@ function AuthLayout() {
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background/60 backdrop-blur">
+          <Button size="icon" variant="ghost" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+            <Menu className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <img src={logo} alt="" className="h-6 w-6 rounded-md" />
+            <span className="text-sm font-semibold">Rafiki AI</span>
+          </div>
+        </div>
         <Outlet />
       </main>
     </div>
