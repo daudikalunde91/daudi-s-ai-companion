@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowUp, Loader2, Mic, MicOff, PhoneCall, PhoneOff } from "lucide-react";
+import { ArrowUp, Check, Copy, Loader2, Mic, MicOff } from "lucide-react";
 import { useVoiceSettings } from "@/lib/voice-settings";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
@@ -53,13 +53,10 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
   const [listening, setListening] = useState(false);
   const recRef = useRef<any>(null);
   const spokenRef = useRef<Set<string>>(new Set());
-  const [callMode, setCallMode] = useState(false);
-  const callModeRef = useRef(false);
-  useEffect(() => { callModeRef.current = callMode; }, [callMode]);
 
   // Auto-speak completed assistant messages
   useEffect(() => {
-    if (!voice.autoSpeak && !callMode) return;
+    if (!voice.autoSpeak) return;
     if (status === "submitted" || status === "streaming") return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") return;
@@ -68,7 +65,7 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
     if (!text.trim()) return;
     spokenRef.current.add(last.id);
     voice.speak(text);
-  }, [messages, status, voice, callMode]);
+  }, [messages, status, voice]);
 
   useEffect(() => () => voice.stop(), [voice]);
 
@@ -96,14 +93,6 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
     rec.onerror = () => setListening(false);
     rec.onend = () => {
       setListening(false);
-      if (callModeRef.current) {
-        // restart automatically while in call mode (unless TTS is speaking)
-        setTimeout(() => {
-          if (callModeRef.current && !window.speechSynthesis?.speaking) {
-            try { rec.start(); setListening(true); } catch { /* noop */ }
-          }
-        }, 400);
-      }
     };
     recRef.current = rec;
     setListening(true);
@@ -114,23 +103,6 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
   function toggleMic() {
     if (listening && recRef.current) { recRef.current.stop(); return; }
     startRecognition(false);
-  }
-
-  function toggleCall() {
-    if (callMode) {
-      setCallMode(false);
-      callModeRef.current = false;
-      recRef.current?.stop?.();
-      voice.stop();
-      return;
-    }
-    setCallMode(true);
-    callModeRef.current = true;
-    startRecognition(true, async (finalText) => {
-      if (!finalText) return;
-      voice.stop();
-      await sendMessage({ text: finalText });
-    });
   }
 
   useEffect(() => {
@@ -206,17 +178,6 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
             <Button
               type="button"
               size="icon"
-              variant={callMode ? "default" : "ghost"}
-              onClick={toggleCall}
-              className="rounded-xl shrink-0"
-              aria-label={callMode ? "End voice conversation" : "Start voice conversation"}
-              title={callMode ? "Maliza mazungumzo ya sauti" : "Anza mazungumzo ya sauti"}
-            >
-              {callMode ? <PhoneOff className="h-4 w-4" /> : <PhoneCall className="h-4 w-4" />}
-            </Button>
-            <Button
-              type="button"
-              size="icon"
               variant={listening ? "default" : "ghost"}
               onClick={toggleMic}
               className="rounded-xl shrink-0"
@@ -263,9 +224,66 @@ function MessageBubble({ message }: { message: UIMessage }) {
   return (
     <div className="flex gap-3">
       <img src={logo} alt="" className="rounded-lg shrink-0 mt-0.5 h-7 w-7 object-cover self-start" />
-      <div className="flex-1 min-w-0 prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-hr:my-4">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text || "…"}</ReactMarkdown>
+      <div className="flex-1 min-w-0 group">
+        <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:p-0 prose-pre:bg-transparent prose-code:text-foreground prose-hr:my-4">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              pre: ({ children }) => <>{children}</>,
+              code: ({ className, children, ...props }: any) => {
+                const inline = !(className && /language-/.test(className));
+                if (inline) {
+                  return <code className={className} {...props}>{children}</code>;
+                }
+                const codeText = String(children).replace(/\n$/, "");
+                const lang = (className || "").replace("language-", "");
+                return <CodeBlock code={codeText} language={lang} />;
+              },
+            }}
+          >{text || "…"}</ReactMarkdown>
+        </div>
+        {text && (
+          <div className="mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <CopyButton value={text} label="Nakili jibu" />
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function CopyButton({ value, label = "Nakili" }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-7 px-2 text-xs text-muted-foreground gap-1.5"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          toast.error("Imeshindikana kunakili");
+        }
+      }}
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? "Imenakiliwa" : label}
+    </Button>
+  );
+}
+
+function CodeBlock({ code, language }: { code: string; language?: string }) {
+  return (
+    <div className="relative my-3 rounded-lg border border-border bg-muted overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/50">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{language || "code"}</span>
+        <CopyButton value={code} label="Nakili" />
+      </div>
+      <pre className="p-3 overflow-x-auto text-xs"><code>{code}</code></pre>
     </div>
   );
 }
