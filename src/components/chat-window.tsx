@@ -178,17 +178,6 @@ export function ChatWindow({ threadId, initialMessages }: Props) {
             <Button
               type="button"
               size="icon"
-              variant={callMode ? "default" : "ghost"}
-              onClick={toggleCall}
-              className="rounded-xl shrink-0"
-              aria-label={callMode ? "End voice conversation" : "Start voice conversation"}
-              title={callMode ? "Maliza mazungumzo ya sauti" : "Anza mazungumzo ya sauti"}
-            >
-              {callMode ? <PhoneOff className="h-4 w-4" /> : <PhoneCall className="h-4 w-4" />}
-            </Button>
-            <Button
-              type="button"
-              size="icon"
               variant={listening ? "default" : "ghost"}
               onClick={toggleMic}
               className="rounded-xl shrink-0"
